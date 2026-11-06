@@ -20,6 +20,7 @@ class AppState extends ChangeNotifier {
   String? activeName;
   int page = 0;
   bool heroHidden = false;
+  bool isPinging = false;
   Timer? _timer;
   StreamSubscription? _stats;
   bool _pinging = false;
@@ -36,9 +37,53 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void replaceServers(List<VpnServer> s) {
+    servers
+      ..clear()
+      ..addAll(s);
+    if (selected >= servers.length) selected = 0;
+    _save();
+    notifyListeners();
+  }
+
   void select(VpnServer s) {
     selected = servers.indexOf(s);
     notifyListeners();
+  }
+
+  /// Быстрый параллельный пинг всех серверов (кнопка в разделе «Серверы»).
+  /// Недоступные получают «н/д», UI раскрашивает пинги по цветам.
+  Future<void> refreshPing() async {
+    if (_pinging || servers.isEmpty) return;
+    _pinging = true;
+    isPinging = true;
+    notifyListeners();
+    try {
+      await pingAllServers(servers, onResult: (_, __) => notifyListeners());
+    } finally {
+      _pinging = false;
+      isPinging = false;
+      notifyListeners();
+    }
+  }
+
+  /// Мгновенный подбор лучшего сервера по пингу.
+  /// Пингует все серверы параллельно и выбирает сервер с минимальным пингом.
+  /// Возвращает лучший сервер или null, если ни один не ответил.
+  Future<VpnServer?> findBestServer() async {
+    if (servers.isEmpty) return null;
+    await refreshPing();
+    VpnServer? best;
+    for (final s in servers) {
+      if (s.pingMs != null && (best == null || s.pingMs! < best.pingMs!)) {
+        best = s;
+      }
+    }
+    if (best != null) {
+      selected = servers.indexOf(best);
+      notifyListeners();
+    }
+    return best;
   }
 
   void setHeroHidden(bool v) {
@@ -49,17 +94,6 @@ class AppState extends ChangeNotifier {
   void goToPage(int p) {
     page = p.clamp(0, 2);
     notifyListeners();
-  }
-
-  /// Пинг всех серверов через реальный TCP-handshake (dart:io).
-  Future<void> refreshPing() async {
-    if (_pinging) return;
-    _pinging = true;
-    try {
-      await pingAllServers(servers, onResult: (_, __) => notifyListeners());
-    } finally {
-      _pinging = false;
-    }
   }
 
   /// Подключение через нативное ядро. Если ядро ещё не подключено,
