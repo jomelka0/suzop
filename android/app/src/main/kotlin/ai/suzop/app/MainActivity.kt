@@ -21,7 +21,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "connect" -> {
-                        val config = call.arguments<Map<String, Any>>()
+                        val config = call.arguments<Map<String, Any>>() ?: mapOf()
                         // Запрашиваем системное разрешение VPN,
                         // если оно ещё не выдано
                         val ready = VpnService.prepare(this@MainActivity)
