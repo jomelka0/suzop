@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 /// Модель VPN-сервера (профиль из ключа/подписки).
 class VpnServer {
   final String name;     // отображаемое имя (обычно содержит флаг страны)
@@ -7,7 +8,7 @@ class VpnServer {
   final int port;
   final String link;     // оригинальная ссылка — её получает нативное ядро
   final String flag;
-  int? pingMs;           // реальный TCP-ping из приложения
+  int? pingMs;           // реальный TCP-ping: null = сервер не ответил («н/д»)
 
   VpnServer({
     required this.name,
@@ -27,14 +28,14 @@ class VpnServer {
     'link': link,
   };
 
+  /// «н/д» = не доступен (не ответил за отведённое время).
   String get pingLabel =>
-      pingMs == null ? '— мс' : (pingMs! > 999 ? '999+' : '$pingMs') + ' мс';
+      pingMs == null ? 'н/д' : (pingMs! > 999 ? '999+' : '$pingMs') + ' мс';
 
+  /// Цвет пинга: null → красный (недоступен), >200 → жёлтый, иначе зелёный.
   Color get pingColor => pingMs == null
-      ? const Color(0xFF9DB4CC)
-      : pingMs! < 80
-          ? const Color(0xFF1FBF6B)
-          : pingMs! < 200
-              ? const Color(0xFFE8A23C)
-              : const Color(0xFFE2574C);
+      ? const Color(0xFFE2574C)
+      : pingMs! > 200
+          ? const Color(0xFFE8A23C)
+          : const Color(0xFF1FBF6B);
 }
