@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 /// Модель VPN-сервера (профиль из ключа/подписки).
 class VpnServer {
   final String name;     // отображаемое имя (обычно содержит флаг страны)
