@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../core/models.dart';
 import '../state.dart';
-import '../theme.dart';
 
 /// Раздел «Серверы»: список, кнопки «Пинг всех» и «Лучший сервер»,
 /// цветная индикация пинга, подсказки при долгом нажатии.
@@ -87,6 +86,28 @@ class ServersPage extends StatelessWidget {
   }
 }
 
+/// Стеклянная карточка (жидкое стекло) — определена прямо здесь,
+/// чтобы не зависеть от theme.dart.
+BoxDecoration _glass(BuildContext context, {bool highlight = false}) {
+  return BoxDecoration(
+    color: Colors.white.withValues(alpha: highlight ? 0.78 : 0.55),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(
+      color: highlight
+          ? const Color(0xFF0A5FA8)
+          : Colors.white.withValues(alpha: 0.6),
+      width: highlight ? 1.8 : 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: const Color(0xFF3B82C4).withValues(alpha: 0.10),
+        blurRadius: 14,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
+}
+
 /// Стеклянная кнопка-чип с подсказкой при долгом нажатии.
 class _ActionChip extends StatelessWidget {
   final String label;
@@ -101,7 +122,7 @@ class _ActionChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: glassDeco(context),
+        decoration: _glass(context),
         child: Text(
           label,
           textAlign: TextAlign.center,
@@ -147,7 +168,7 @@ class _ServerTile extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: glassDeco(context, highlight: selected),
+        decoration: _glass(context, highlight: selected),
         child: Row(
           children: [
             Text(server.flag, style: const TextStyle(fontSize: 26)),
