@@ -1,0 +1,40 @@
+name: Build suzop APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # можно запустить вручную кнопкой
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Забрать код из репозитория
+      - uses: actions/checkout@v4
+
+      # 2. Установить Flutter
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # 3. Сгенерировать недостающую Android-обвязку (gradle-файлы и т.д.),
+      #    не трогая наш lib/, pubspec.yaml и android/ файлы
+      - name: Bootstrap project
+        run: |
+          flutter create . --org ai.suzop --project-name suzop --platforms android
+
+      # 4. Зависимости
+      - name: Pub get
+        run: flutter pub get
+
+      # 5. Сборка release-APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 6. Выложить готовый APK как артефакт для скачивания
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: suzop-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
