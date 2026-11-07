@@ -63,11 +63,12 @@ class _RootShellState extends State<RootShell> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Row(children: [
-                const Text('suzop',
+                // ВАЖНО: без const — цвет зависит от темы.
+                Text('SUZOP',
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: .5,
+                        letterSpacing: 1.2,
                         color: SuzopColors.ink)),
                 const Spacer(),
                 GlassCard(
@@ -85,11 +86,12 @@ class _RootShellState extends State<RootShell> {
                       ),
                     ),
                     const SizedBox(width: 6),
+                    // Без const — SuzopColors.muted зависит от темы.
                     Text(
                         st.state == 2
                             ? L.t('Защищено', 'Protected')
                             : L.t('Не защищено', 'Unprotected'),
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: SuzopColors.muted)),
