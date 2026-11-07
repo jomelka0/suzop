@@ -7,8 +7,11 @@ import 'core/parsers.dart';
 import 'core/ping.dart';
 import 'core/vpn_bridge.dart';
 import 'core/subscription_fetch.dart';
+import 'i18n.dart';
+import 'theme.dart';
 
-/// Единое состояние приложения: серверы, подписки, пинг, подключение.
+/// Единое состояние приложения: серверы, подписки, пинг, подключение,
+/// тема, язык, автообновление, трафик подписки и плашка ошибки.
 class AppState extends ChangeNotifier {
   final List<VpnServer> servers = [];
   final List<String> subUrls = [];
@@ -21,9 +24,26 @@ class AppState extends ChangeNotifier {
   int page = 0;
   bool heroHidden = false;
   bool isPinging = false;
+  bool dark = false;       // тёмная тема
+  String language = 'ru';  // 'ru' | 'en'
+
+  /// Автообновление подписки в минутах. 0 = выключено.
+  int autoRefreshMinutes = 60;
+  DateTime? lastAutoRefresh;
+
+  /// Реальный трафик из заголовка подписки (subscription-userinfo).
+  int trafficUsedBytes = 0;
+  int? trafficLimitBytes;
+
+  /// Плашка ошибки: текст + подсказка «почему и как починить».
+  String? errorText;
+  String? errorHelp;
+
   Timer? _timer;
+  Timer? _autoTimer;
   StreamSubscription? _stats;
   bool _pinging = false;
+  bool _autoRefreshing = false;
 
   void addServers(List<VpnServer> s) {
     servers.addAll(s);
@@ -32,8 +52,9 @@ class AppState extends ChangeNotifier {
   }
 
   void addSub(String url, [int? count]) {
-    subUrls.add(url);
+    if (!subUrls.contains(url)) subUrls.add(url);
     _save();
+    _restartAutoTimer();
     notifyListeners();
   }
 
@@ -51,8 +72,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Быстрый параллельный пинг всех серверов (кнопка в разделе «Серверы»).
-  /// Недоступные получают «н/д», UI раскрашивает пинги по цветам.
+  /// Записывает реальный трафик, отданный панелью подписки.
+  void setTrafficInfo(SubscriptionInfo info) {
+    trafficUsedBytes = info.uploadBytes + info.downloadBytes;
+    trafficLimitBytes = info.totalBytes;
+    notifyListeners();
+  }
+
+  /// Показывает красивую плашку ошибки внизу экрана.
+  void showError(String text, [String? help]) {
+    errorText = text;
+    errorHelp = help;
+    notifyListeners();
+  }
+
+  /// Закрывает плашку ошибки (крестик).
+  void clearError() {
+    errorText = null;
+    errorHelp = null;
+    notifyListeners();
+  }
+
+  /// Быстрый параллельный пинг всех серверов.
   Future<void> refreshPing() async {
     if (_pinging || servers.isEmpty) return;
     _pinging = true;
@@ -68,8 +109,6 @@ class AppState extends ChangeNotifier {
   }
 
   /// Мгновенный подбор лучшего сервера по пингу.
-  /// Пингует все серверы параллельно и выбирает сервер с минимальным пингом.
-  /// Возвращает лучший сервер или null, если ни один не ответил.
   Future<VpnServer?> findBestServer() async {
     if (servers.isEmpty) return null;
     await refreshPing();
@@ -96,8 +135,67 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Подключение через нативное ядро. Если ядро ещё не подключено,
-  /// честно возвращает false — UI корректно это показывает.
+  /// Включение/выключение тёмной темы (сохраняется).
+  Future<void> setDark(bool value) async {
+    dark = value;
+    SuzopTheme.dark = value;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('dark_theme', value);
+    notifyListeners();
+  }
+
+  /// Смена языка интерфейса: 'ru' или 'en' (сохраняется).
+  Future<void> setLanguage(String value) async {
+    if (value != 'ru' && value != 'en') return;
+    language = value;
+    L.lang = value;
+    final p = await SharedPreferences.getInstance();
+    await p.setString('language', value);
+    notifyListeners();
+  }
+
+  /// Выбор интервала автообновления подписки (сохраняется и применяется).
+  Future<void> setAutoRefreshMinutes(int minutes) async {
+    autoRefreshMinutes = minutes;
+    final p = await SharedPreferences.getInstance();
+    await p.setInt('auto_refresh_min', minutes);
+    _restartAutoTimer();
+    notifyListeners();
+  }
+
+  /// Перезапускает таймер автообновления по текущему интервалу.
+  /// Работает, пока приложение открыто; фоновое обновление «всегда»
+  /// появится вместе с foreground-сервисом VPN-ядра.
+  void _restartAutoTimer() {
+    _autoTimer?.cancel();
+    if (autoRefreshMinutes <= 0 || subUrls.isEmpty) return;
+    _autoTimer = Timer.periodic(Duration(minutes: autoRefreshMinutes),
+        (_) => autoRefreshSubscriptions());
+  }
+
+  /// Тихо обновляет все подписки (для автообновления и запуска).
+  Future<void> autoRefreshSubscriptions() async {
+    if (_autoRefreshing || subUrls.isEmpty) return;
+    _autoRefreshing = true;
+    try {
+      for (final u in List<String>.of(subUrls)) {
+        try {
+          final info = await fetchSubscription(u);
+          if (info.servers.isNotEmpty) replaceServers(info.servers);
+          setTrafficInfo(info);
+        } catch (_) {
+          // Сеть недоступна — попробуем в следующий раз.
+        }
+      }
+      lastAutoRefresh = DateTime.now();
+      notifyListeners();
+    } finally {
+      _autoRefreshing = false;
+    }
+  }
+
+  /// Подключение через нативное ядро. Пока ядро не интегрировано —
+  /// честно возвращает false, UI это корректно показывает.
   Future<bool> tryConnect() async {
     if (servers.isEmpty) return false;
     state = 1;
@@ -134,13 +232,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Загружает сохранённые подписки и парсит их (при наличии сети).
+  /// Загружает сохранённые подписки, тему, язык и интервал.
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     final urls = (p.getStringList('sub_urls') ?? []);
     final links = (p.getStringList('server_links') ?? []);
     subUrls.addAll(urls);
     servers.addAll(links.map(parseLink).whereType<VpnServer>());
+    dark = p.getBool('dark_theme') ?? false;
+    language = p.getString('language') ?? 'ru';
+    autoRefreshMinutes = p.getInt('auto_refresh_min') ?? 60;
+    SuzopTheme.dark = dark;
+    L.lang = language;
+    _restartAutoTimer();
     notifyListeners();
   }
 
@@ -149,6 +253,21 @@ class AppState extends ChangeNotifier {
     await p.setStringList('sub_urls', subUrls);
     await p.setStringList(
         'server_links', servers.map((s) => s.link).toList());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _autoTimer?.cancel();
+    _stats?.cancel();
+    super.dispose();
+  }
+
+  String? get lastRefreshLabel {
+    final t = lastAutoRefresh;
+    if (t == null) return null;
+    return '${t.hour.toString().padLeft(2, '0')}:'
+        '${t.minute.toString().padLeft(2, '0')}';
   }
 
   String get timeLabel {
