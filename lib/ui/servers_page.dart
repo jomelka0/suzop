@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/models.dart';
+import '../i18n.dart';
 import '../state.dart';
+import '../theme.dart';
 
-/// Раздел «Серверы»: список, кнопки «Пинг всех» и «Лучший сервер»,
+/// Раздел «Серверы»: список, «Пинг всех», «Лучший сервер»,
 /// цветная индикация пинга, подсказки при долгом нажатии.
+/// Ошибки показываются стеклянной плашкой внизу (не SnackBar).
 class ServersPage extends StatelessWidget {
   const ServersPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final theme = Theme.of(context);
+    final dark = SuzopTheme.dark;
 
     return Column(
       children: [
@@ -23,36 +26,52 @@ class ServersPage extends StatelessWidget {
             children: [
               Expanded(
                 child: _ActionChip(
-                  label: app.isPinging ? 'Пинг…' : '⟳ Пинг всех',
-                  hint: 'Проверяет ВСЕ серверы одновременно (быстро, ~2 сек).\n'
+                  label: app.isPinging
+                      ? L.t('Пинг…', 'Pinging…')
+                      : L.t('⟳ Пинг всех', '⟳ Ping all'),
+                  hint: L.t(
+                      'Проверяет ВСЕ серверы одновременно (быстро, ~2 сек).\n'
                       'У каждого сервера появится его пинг в миллисекундах.\n'
                       'Если сервер не ответил — покажет «н/д» (не доступен).\n\n'
                       'Пример: после нажатия список станет:\n'
                       '🇳🇱 Амстердам — 32 мс (зелёный)\n'
                       '🇺🇸 Нью-Йорк — 210 мс (жёлтый)\n'
                       '🇯🇵 Токио — н/д (красный)',
+                      'Checks ALL servers at once (fast, ~2 sec).\n'
+                      'Each server gets its ping in milliseconds.\n'
+                      'If a server did not answer — it shows "n/a".\n\n'
+                      'Example: after the check the list becomes:\n'
+                      '🇳🇱 Amsterdam — 32 ms (green)\n'
+                      '🇺🇸 New York — 210 ms (yellow)\n'
+                      '🇯🇵 Tokyo — n/a (red)'),
                   onTap: app.isPinging ? null : () => app.refreshPing(),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _ActionChip(
-                  label: '⚡ Лучший',
-                  hint: 'Находит сервер с САМЫМ НИЗКИМ пингом и сразу выбирает его.\n'
+                  label: L.t('⚡ Лучший', '⚡ Best'),
+                  hint: L.t(
+                      'Находит сервер с САМЫМ НИЗКИМ пингом и сразу выбирает его.\n'
                       'Пингует все серверы параллельно и берёт лучший.\n\n'
                       'Пример: был выбран Токио (164 мс), нажал «⚡ Лучший» —\n'
                       'приложение выбрало Амстердам (32 мс) и он подсветился.',
+                      'Finds the server with the LOWEST ping and selects it.\n'
+                      'Pings all servers in parallel and picks the best one.\n\n'
+                      'Example: Tokyo was selected (164 ms), tap "⚡ Best" —\n'
+                      'the app selected Amsterdam (32 ms) and highlighted it.'),
                   onTap: app.isPinging
                       ? null
                       : () async {
                           final best = await app.findBestServer();
-                          if (!context.mounted) return;
-                          final msg = best == null
-                              ? 'Ни один сервер не ответил'
-                              : 'Выбран лучший: ${best.flag} ${best.name} — ${best.pingMs} мс';
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(SnackBar(content: Text(msg)));
+                          if (best == null) {
+                            app.showError(
+                                L.t('Ни один сервер не ответил',
+                                    'No server responded'),
+                                Help.bestNone);
+                          } else {
+                            app.clearError();
+                          }
                         },
                 ),
               ),
@@ -65,10 +84,10 @@ class ServersPage extends StatelessWidget {
           child: app.servers.isEmpty
               ? Center(
                   child: Text(
-                    'Нет серверов.\nДобавь ключ или подписку\nво вкладке «Подписка».',
+                    L.t('Нет серверов.\nДобавь ключ или подписку\nво вкладке «Подписка».',
+                        'No servers.\nAdd a key or subscription\non the "Subscription" tab.'),
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: Colors.black54),
+                    style: TextStyle(color: SuzopColors.muted, fontSize: 14),
                   ),
                 )
               : ListView.builder(
@@ -86,21 +105,26 @@ class ServersPage extends StatelessWidget {
   }
 }
 
-/// Стеклянная карточка (жидкое стекло) — определена прямо здесь,
-/// чтобы не зависеть от theme.dart.
-BoxDecoration _glass(BuildContext context, {bool highlight = false}) {
+/// Стеклянная декорация (в цвете темы) — определена прямо здесь.
+BoxDecoration _glass({bool highlight = false}) {
+  final dark = SuzopTheme.dark;
   return BoxDecoration(
-    color: Colors.white.withValues(alpha: highlight ? 0.78 : 0.55),
+    color: dark
+        ? Colors.white.withValues(alpha: highlight ? 0.20 : 0.08)
+        : Colors.white.withValues(alpha: highlight ? 0.78 : 0.55),
     borderRadius: BorderRadius.circular(18),
     border: Border.all(
       color: highlight
           ? const Color(0xFF0A5FA8)
-          : Colors.white.withValues(alpha: 0.6),
+          : (dark
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.white.withValues(alpha: 0.6)),
       width: highlight ? 1.8 : 1,
     ),
     boxShadow: [
       BoxShadow(
-        color: const Color(0xFF3B82C4).withValues(alpha: 0.10),
+        color: (dark ? Colors.black : const Color(0xFF3B82C4))
+            .withValues(alpha: dark ? 0.35 : 0.10),
         blurRadius: 14,
         offset: const Offset(0, 4),
       ),
@@ -108,7 +132,7 @@ BoxDecoration _glass(BuildContext context, {bool highlight = false}) {
   );
 }
 
-/// Стеклянная кнопка-чип с подсказкой при долгом нажатии.
+/// Кнопка-чип с подсказкой при долгом нажатии.
 class _ActionChip extends StatelessWidget {
   final String label;
   final String hint;
@@ -122,7 +146,7 @@ class _ActionChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: _glass(context),
+        decoration: _glass(),
         child: Text(
           label,
           textAlign: TextAlign.center,
@@ -137,7 +161,7 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
-/// Карточка одного сервера с цветным пингом и подсказкой при долгом нажатии.
+/// Карточка сервера с цветным пингом и подсказкой при долгом нажатии.
 class _ServerTile extends StatelessWidget {
   final VpnServer server;
   final bool selected;
@@ -145,20 +169,18 @@ class _ServerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final pingColor = server.pingColor;
     return GestureDetector(
-      // Долгое нажатие → подробная подсказка «что делает».
       onLongPress: () => _showHint(
         context,
         '${server.flag} ${server.name}\n'
-        'Протокол: ${server.protocol}\n'
-        'Адрес: ${server.host}:${server.port}\n\n'
-        'Пинг ${server.pingLabel} — это время отклика сервера.\n'
-        'Зелёный < 200 мс — отлично, игры и звонки без лагов.\n'
-        'Жёлтый > 200 мс — заметные задержки, страницы грузятся дольше.\n'
-        'Красный «н/д» — сервер не отвечает, подключение не получится.\n\n'
-        'Одиночное нажатие — выбрать этот сервер для подключения.',
+            '${L.t('Протокол', 'Protocol')}: ${server.protocol}\n'
+            '${L.t('Адрес', 'Address')}: ${server.host}:${server.port}\n\n'
+            '${L.t('Пинг', 'Ping')} ${server.pingLabel} — ${L.t('время отклика сервера', 'server response time')}\n'
+            '${L.t('Зелёный < 200 мс — отлично.', 'Green < 200 ms — excellent.')}\n'
+            '${L.t('Жёлтый > 200 мс — заметные задержки.', 'Yellow > 200 ms — noticeable delay.')}\n'
+            '${L.t('Красный «н/д» — сервер не отвечает.', 'Red "n/a" — server not responding.')}\n\n'
+            '${L.t('Одиночное нажатие — выбрать этот сервер.', 'Single tap — select this server.')}',
       ),
       onTap: () {
         final app = context.read<AppState>();
@@ -168,7 +190,7 @@ class _ServerTile extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: _glass(context, highlight: selected),
+        decoration: _glass(highlight: selected),
         child: Row(
           children: [
             Text(server.flag, style: const TextStyle(fontSize: 26)),
@@ -177,18 +199,16 @@ class _ServerTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    server.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    server.protocol,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.black45),
-                  ),
+                  Text(server.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: SuzopColors.ink)),
+                  Text(server.protocol,
+                      style: TextStyle(
+                          fontSize: 12, color: SuzopColors.muted)),
                 ],
               ),
             ),
@@ -216,21 +236,26 @@ class _ServerTile extends StatelessWidget {
   }
 }
 
-/// Всплывающая стеклянная плашка-подсказка: полностью понятное
-/// описание функции + примеры. Закрывается тапом.
+/// Всплывающая стеклянная плашка-подсказка.
 Future<void> _showHint(BuildContext context, String text) async {
+  final dark = SuzopTheme.dark;
   showDialog(
     context: context,
     barrierColor: Colors.black26,
     builder: (ctx) => GestureDetector(
       onTap: () => Navigator.of(ctx).pop(),
       child: AlertDialog(
-        backgroundColor: Colors.white.withValues(alpha: 0.96),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: dark
+            ? const Color(0xFF16294A).withValues(alpha: 0.97)
+            : Colors.white.withValues(alpha: 0.96),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         content: Text(
           text,
-          style: const TextStyle(
-              fontSize: 14.5, height: 1.5, color: Color(0xFF12303F)),
+          style: TextStyle(
+              fontSize: 14.5,
+              height: 1.5,
+              color: dark ? const Color(0xFFEAF4FF) : const Color(0xFF12303F)),
         ),
       ),
     ),
