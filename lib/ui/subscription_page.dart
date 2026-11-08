@@ -11,6 +11,7 @@ import '../theme.dart';
 /// Раздел «Подписка».
 /// Плашка «Основная подписка» показывается ТОЛЬКО когда подписка
 /// добавлена. Трафик — только реальный, из заголовка подписки.
+/// ВАЖНО: все TextStyle с SuzopColors.* — БЕЗ const (цвет зависит от темы).
 class SubscriptionPage extends StatefulWidget {
   const SubscriptionPage({super.key});
 
@@ -158,7 +159,9 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
 
   String _fmtGb(int bytes) {
     final gb = bytes / (1024 * 1024 * 1024);
-    return gb >= 10 ? '${gb.round()} ГБ' : '${gb.toStringAsFixed(1)} ГБ';
+    return L.t(
+        '${gb >= 10 ? gb.round() : gb.toStringAsFixed(1)} ГБ',
+        '${gb >= 10 ? gb.round() : gb.toStringAsFixed(1)} GB');
   }
 
   @override
@@ -175,14 +178,17 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Основная подписка',
+                  // Без const: цвет темы.
+                  Text(L.t('Основная подписка', 'Main subscription'),
                       style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                           color: SuzopColors.ink)),
                   const SizedBox(height: 2),
-                  Text('Серверов: ${st.servers.length} · подписок: ${st.subUrls.length}',
-                      style: const TextStyle(
+                  Text(
+                      L.t('Серверов: ${st.servers.length} · подписок: ${st.subUrls.length}',
+                          'Servers: ${st.servers.length} · subscriptions: ${st.subUrls.length}'),
+                      style: TextStyle(
                           fontSize: 11.5, color: SuzopColors.muted)),
                   const SizedBox(height: 10),
                   ...[
@@ -197,10 +203,10 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(kv.$1,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontSize: 13, color: SuzopColors.muted)),
                               Text(kv.$2,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                       color: SuzopColors.ink)),
@@ -223,7 +229,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                     ),
                     const SizedBox(height: 6),
                     Text('${_fmtGb(st.trafficUsedBytes)} / ${_fmtGb(st.trafficLimitBytes!)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11.5, color: SuzopColors.muted)),
                   ],
                 ]),
@@ -240,7 +246,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                 Expanded(
                   child: Text(L.t('Импорт подписки или ключа',
                       'Import subscription or key'),
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: SuzopColors.ink)),
@@ -333,7 +339,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                   child: Text(s.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: SuzopColors.ink)),
