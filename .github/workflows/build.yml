@@ -24,15 +24,28 @@ jobs:
         run: |
           flutter create . --org ai.suzop --project-name suzop --platforms android
 
-      # 4. Зависимости
+      # 4. Фирменная иконка SUZOP: скачиваем PNG и ставим его вместо
+      #    стандартной иконки Flutter во все плотности экрана.
+      #    Удаляем adaptive-XML, иначе Android берёт стандартную заглушку.
+      #    Если картинка недоступна — сборка продолжается со стандартной.
+      - name: SUZOP launcher icon
+        run: |
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          if curl -fsSL -o /tmp/icon.png "https://d2lm3begjhzc49.cloudfront.net/file-interaction/7988fcb4-ic_launcher_suzop.png"; then
+            for d in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+              cp /tmp/icon.png "android/app/src/main/res/$d/ic_launcher.png"
+            done
+          fi
+
+      # 5. Зависимости
       - name: Pub get
         run: flutter pub get
 
-      # 5. Сборка release-APK
+      # 6. Сборка release-APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 6. Выложить готовый APK как артефакт для скачивания
+      # 7. Выложить готовый APK как артефакт для скачивания
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
