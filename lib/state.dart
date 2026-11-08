@@ -45,9 +45,18 @@ class AppState extends ChangeNotifier {
   bool _pinging = false;
   bool _autoRefreshing = false;
 
+  /// Добавляет серверы без дубликатов: сервер с тем же link
+  /// (оригинальной ссылкой) не добавляется повторно.
   void addServers(List<VpnServer> s) {
-    servers.addAll(s);
-    _save();
+    final existing = servers.map((x) => x.link).toSet();
+    var added = 0;
+    for (final v in s) {
+      if (existing.add(v.link)) {
+        servers.add(v);
+        added++;
+      }
+    }
+    if (added > 0) _save();
     notifyListeners();
   }
 
@@ -164,7 +173,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// Перезапускает таймер автообновления по текущему интервалу.
-  /// Работает, пока приложение открыто; фоновое обновление «всегда»
+  /// Работает пока приложение открыто; фоновое обновление «всегда»
   /// появится вместе с foreground-сервисом VPN-ядра.
   void _restartAutoTimer() {
     _autoTimer?.cancel();
