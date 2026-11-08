@@ -29,7 +29,12 @@ class _RootShellState extends State<RootShell> {
     final st = context.read<AppState>();
     _page = st.page.toDouble();
     _pc = PageController(initialPage: st.page)
-      ..addListener(() => _page = _pc.hasClients ? _pc.page ?? _page : _page);
+      ..addListener(() {
+        final p = _pc.hasClients ? _pc.page : null;
+        if (p != null && p != _page) {
+          setState(() => _page = p);
+        }
+      });
   }
 
   @override
